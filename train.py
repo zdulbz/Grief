@@ -3,7 +3,7 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 
-def initial_train(rewards, replays = 0, gamma = 0.9, w = 0.7, object_value = 10, steps = 20000, grid_size = 5, final_epsilon = 1, update = "Q-learning", sampling = "random",temp=None, se=1):
+def initial_train(rewards, replays = 0, gamma = 0.9, w = 0.7, object_value = 10, steps = 20000, grid_size = 5, final_epsilon = 1, update = "Q-learning", sampling = "random",temp=None, se=1, happiness = None):
   time_steps = steps
   world = environment.grid(grid_size,object_value)
   dude = environment.agent(world, nactions=4)
@@ -13,6 +13,8 @@ def initial_train(rewards, replays = 0, gamma = 0.9, w = 0.7, object_value = 10,
   dude.env.distribute_rewards(rewards)
   dude.sarsa_epsilon = se
   dude.k = replays
+  dude.happiness = happiness
+
 
   dude.gamma = gamma
   dude.w = w

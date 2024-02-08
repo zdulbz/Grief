@@ -22,17 +22,17 @@ lose = [list(reward_dist.keys())[state] for state in states_to_lose]
 PGD_groups = 20
 time_factor = 80
 default_values = {}  # example default values for non-selected parameters
-lr_mood = 0.001
+lr_mood = 0.01
 mood_lims = (-15,6)
 stop_grief = 5000
 optima=True
 
-runs = 1
+runs = 3
 grid_size = 8
-plots = ['PGD'] #'3d','bar','rgrief','p','mood', 'PGD', 'reward_surface'
-bar_col, bar_width = 'Blues', 0.1
+plots = ['bar','mood'] #'3d','bar','rgrief','p','mood', 'PGD', 'reward_surface'
+bar_col, bar_width = 'jet', 0.1
 eta = 0.5
-rws = [0]
+rws = [0.5]
 # mood_varying_params = ['replays','pain']
 clip = [0,-1]
 steps = 5000
@@ -41,19 +41,19 @@ replays_init = 50
 
 # Parameter gridQ-
 grid_search = {
-    'w': [0.5],
-    # 'w': [0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
+    # 'w': [1],
+    'w': [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
     'object_value': [10],
-    # 'replays':[9,10],
-    'replays':[10],
+    'replays':[20],
+    # 'replays':[0,5,10,15,20,25,30],
     # 'alpha': [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
     'alpha': [0.1],
     # 'rw': [0,0.1,0.2,0.3,0.5,0.7],
     'rw': [rws[0]],
     'stop_grief': [stop_grief],
     # 'pain': [0,-10,-50,-100,-500,-1000],
-    'pain': list(np.random.uniform(10,20,PGD_groups)) + list(np.random.uniform(0,-20,PGD_groups)),# + list(np.random.uniform(-10,-20,PGD_groups)),
-    # 'pain': [-10],
+    # 'pain': list(np.random.uniform(10,20,PGD_groups)) + list(np.random.uniform(0,-20,PGD_groups)),# + list(np.random.uniform(-10,-20,PGD_groups)),
+    'pain': [-50],
     'gamma': [0.95],
     # 'loss_reward': [-1],
     # 'pain':[0,-5,-10,-20,-30,-40,-50,-60,-70,-80,-90,-100],
@@ -69,7 +69,7 @@ grid_search = {
     # 'p': [0.0156],
     'update': ["Q-learning"],
     'sampling': ["random"],
-    'happiness': [False]
+    'happiness': [[1,0,0,0],[1,1,0,0],[1,0,1,1],[1,0,1,10],[0,1,1,1],[1,1,1,1],[0,1,0,0]] # w1,w2,w3,p
 }
 
 # replay_weight_middle = 0
@@ -92,11 +92,12 @@ if training:
   prev_w = grid_search['w'][0]
   prev_ob = grid_search['object_value'][0]
   prev_gam = grid_search['gamma'][0]
+  prev_hap = grid_search['happiness'][0]
 
   for loss_state in lose:
     reward_dist[loss_state] = prev_ob # changes initial value of first reward
 
-  qs_init, model_init, qci = train.initial_train(reward_dist, gamma=prev_gam, w=prev_w, object_value = prev_ob, grid_size = grid_size, steps = initial_steps, replays=replays_init)
+  qs_init, model_init, qci = train.initial_train(reward_dist, gamma=prev_gam, w=prev_w, object_value = prev_ob, grid_size = grid_size, steps = initial_steps, replays=replays_init, happiness=prev_hap)
   if 'SARSA' in grid_search['update']: qs_init_sars, model_init_sars, qci = train.initial_train(reward_dist, gamma=0.95, w=prev_w, object_value = prev_ob, grid_size = grid_size, steps = initial_steps,update="SARSA", se=se)
   for values in product(*grid_search.values()):
 
@@ -109,15 +110,17 @@ if training:
       cur_w = point['w']
       cur_ob = point['object_value']
       cur_gam = point['gamma']
+      cur_hap = point['happiness']
 
-      if cur_w != prev_w or cur_ob != prev_ob or cur_gam != prev_gam:
-        print('Change', cur_w, prev_w, cur_ob, prev_ob, cur_gam, prev_gam)
-        qs_init, model_init, qci = train.initial_train(reward_dist, gamma=point['gamma'], w=point['w'], object_value = point['object_value'], grid_size = grid_size, steps = initial_steps, replays=replays_init)
+      if cur_w != prev_w or cur_ob != prev_ob or cur_gam != prev_gam or cur_hap != prev_hap:
+        print('Change', cur_w, prev_w, cur_ob, prev_ob, cur_gam, prev_gam, cur_hap, prev_hap)
+        qs_init, model_init, qci = train.initial_train(reward_dist, gamma=point['gamma'], w=point['w'], object_value = point['object_value'], grid_size = grid_size, steps = initial_steps, replays=replays_init, happiness=point['happiness'])
         if point['update']=='SARSA': qs_init_sars, model_init_sars, qci = train.initial_train(reward_dist, gamma=point['gamma'], w=point['w'], object_value = point['object_value'], grid_size = grid_size, steps = initial_steps,update="SARSA",se=se)
 
       prev_w = cur_w
       prev_ob = cur_ob
       prev_gam = cur_gam
+      prev_hap = cur_hap
 
       rewards[label] = []
       total_errors[label] = []

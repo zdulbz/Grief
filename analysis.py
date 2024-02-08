@@ -370,7 +370,7 @@ def bar_plot(rewards,reward_means,reward_stds,n_bars,runs,label,grid_search,vary
       ith_values = [group[i] for group in grouped_values if len(group) > i]
       ith_stds = [group[i] if len(group) > i and group[i] != 0 else 0 for group in grouped_stds]
       color = cmap[i]
-      pain_correct = int(grid_search[varying_params[-1]][i]/grid_search['object_value'][0])
+      if varying_params[-1] == 'pain': pain_correct = int(grid_search[varying_params[-1]][i]/grid_search['object_value'][0])
       ax.bar(ind + i * wid, ith_values, width=wid, color=color, label='$r_{grief}$' + f' = {pain_correct}' if varying_params[-1] == 'pain' 
                                     else '$\epsilon$' + f' = {grid_search[varying_params[-1]][i]}' if varying_params[-1] == 'final_epsilon' 
                                     else 'Anneal steps: ' + f'{int(1/grid_search[varying_params[-1]][i])}' if varying_params[-1] == 'ep_anneal' 

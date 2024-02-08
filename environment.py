@@ -145,7 +145,7 @@ class agent():
     self.sampling_method = "random"  # Options: "random", "lost", "TD-error", "negative_bias"
     self.rgrief = 0
     self.sarsa_epsilon = 1
-    self.happiness = False
+    self.happiness = None
 
   def update_priorities(self, state, action, td_error):
     self.transition_td_errors[(state, action)] = abs(td_error)
@@ -209,14 +209,15 @@ class agent():
     # if replay: 
       # if np.random.uniform() < 0.2: reward = -(reward % 10)
       # reward = np.random.normal(reward,2)
-    w1,w2,w3,p = 0.7,0.4,0.8,1 #0,0.1,1,1
-    w1,w2,w3,p = 0,0.1,1,1
-    f = (w1+w2+w3)*reward - w3*p - w2*prev_value
-    delta_happiness = f + self.gamma * max_value - prev_value
+    if self.happiness is not None:
+      # w1,w2,w3,p = 0.7,0.4,0.8,1 #0,0.1,1,1
+      w1,w2,w3,p = self.happiness
+      f = (w1+w2+w3)*reward - w3*p - w2*prev_value
+      delta_happiness = f + self.gamma * future_value - prev_value
     delta_regular = reward + self.gamma * max_value - prev_value
     delta_w = reward + self.gamma * future_value - prev_value
     # a = 0.001 if action == 4 else self.alpha
-    delta = delta_happiness if self.happiness else delta_w #decides which delta to use in updates
+    delta = delta_happiness if self.happiness is not None else delta_w #decides which delta to use in updates
     self.q_vals[state,action] = prev_value + self.alpha * delta
     self.time_cost += 1
     self.regular_prediction_errors.append(delta_regular)
