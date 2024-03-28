@@ -3,10 +3,11 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 
-def initial_train(rewards, replays = 0, gamma = 0.9, w = 0.7, object_value = 10, steps = 20000, grid_size = 5, final_epsilon = 1, update = "Q-learning", sampling = "random",temp=None, se=1, happiness = None):
+def initial_train(rewards, replays = 0, gamma = 0.9, w = 0.7, alpha = 0.1, object_value = 10, steps = 20000, grid_size = 5, final_epsilon = 1, update = "Q-learning", sampling = "random",temp=None, se=1, happiness = None,**kwargs):
   time_steps = steps
   world = environment.grid(grid_size,object_value)
   dude = environment.agent(world, nactions=4)
+  dude.alpha = alpha
   dude.set_update_method(update)
   dude.set_sampling_method(sampling,temp)       # For TD-error prioritization
   dude.epsilon = final_epsilon
@@ -36,7 +37,10 @@ def initial_train(rewards, replays = 0, gamma = 0.9, w = 0.7, object_value = 10,
   return dude.q_vals, dude.model, dude.q_timecourse
 
 
-def train_DYNA_agent(rewards, lose, grid_size = 10, steps = 5000, gamma = 0.99, alpha = 0.1, w = 0.7, final_epsilon = 0.01, starting_qs = None, model = None, replays = 2, p = 0, pain = 0, object_value = 10, plotting = False, update = "Q-learning", sampling = "random", temp=None, se = 1, ep_anneal = 1, stop_grief = 10000,loss_reward=0,happiness=False,**kwargs):
+def train_DYNA_agent(reward_dist, lose, grid_size = 10, steps = 5000, gamma = 0.99, alpha = 0.1, w = 0.7, 
+                    final_epsilon = 0.01, starting_qs = None, model = None, replays = 2, p = 0, pain = 0, 
+                    object_value = 10, plotting = False, update = "Q-learning", sampling = "random", temp=None, 
+                    se = 1, ep_anneal = 1, stop_grief = 10000,loss_reward=0,happiness=False,pre_grieve=0,**kwargs):
 
   world = environment.grid(grid_size,object_value,loss_reward=loss_reward)
   dude = environment.agent(world, nactions = 4)
@@ -48,7 +52,7 @@ def train_DYNA_agent(rewards, lose, grid_size = 10, steps = 5000, gamma = 0.99, 
   dude.happiness = happiness
   dude.set_update_method(update)
   dude.set_sampling_method(sampling,temp)       # For TD-error prioritization
-  dude.env.distribute_rewards(rewards)
+  dude.env.distribute_rewards(reward_dist)
   lost_locs = []
   dude.rgrief = pain
   dude.w = w
@@ -78,9 +82,15 @@ def train_DYNA_agent(rewards, lose, grid_size = 10, steps = 5000, gamma = 0.99, 
 
   dude.env.loc = [0,0]
   # dude.render_value_map()
-
+  if pre_grieve > 0:
+    reward_pre = {(0,0): 10}
+    dude.env.distribute_rewards(reward_pre)
 
   for i in range(steps):
+
+    if i == pre_grieve:
+      reward_post = {(0,0): 0}
+      dude.env.distribute_rewards(reward_post)
 
     if i == stop_grief:
       for loc,action in lost_locs:
@@ -94,7 +104,7 @@ def train_DYNA_agent(rewards, lose, grid_size = 10, steps = 5000, gamma = 0.99, 
     dude.update_q_vals(state,action,reward,next_state,next_action)
     dude.replay()
     # dude.model[state,action] = reward, next_state
-    rewards += reward
+    if reward < 10: rewards += reward
     reward_course.append(reward)
 
   if plotting:

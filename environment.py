@@ -213,7 +213,9 @@ class agent():
       # w1,w2,w3,p = 0.7,0.4,0.8,1 #0,0.1,1,1
       w1,w2,w3,p = self.happiness
       f = (w1+w2+w3)*reward - w3*p - w2*prev_value
+      # print(f'f: {f}, future: {self.gamma*future_value}, prev: {prev_value}, loc: {self.env.loc}')
       delta_happiness = f + self.gamma * future_value - prev_value
+      # print(f'delta: {delta_happiness}')
     delta_regular = reward + self.gamma * max_value - prev_value
     delta_w = reward + self.gamma * future_value - prev_value
     # a = 0.001 if action == 4 else self.alpha
@@ -257,10 +259,12 @@ class agent():
 
 
   def replay(self):
+    grieving = False
     for i in range(self.k):
       if self.sampling_method == "random":
         if np.random.rand() < self.p and len(self.transitions_to_lost_states) > 0:
           state, action = random.choice(self.transitions_to_lost_states)
+          grieving = True
         else:
           candidates = np.array(np.where(~np.isnan(self.model[:,:,0]))).T
           idx = np.random.choice(len(candidates))
@@ -283,6 +287,9 @@ class agent():
       #   state, action = loss_states[i][0], loss_states[i][1]
 
       reward, next_state = self.model[state, action]
+      # if grieving and np.random.uniform() < 0.01: reward *= -1
+      # if grieving: reward = np.random.normal(reward,5)
+
       next_action = self.select_action(next_state,replay=True) if self.update_method == "SARSA" else None
 
       # print(state,action,reward,next_state)

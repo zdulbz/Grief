@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.colors import LinearSegmentedColormap
 plt.rcParams.update({'font.size': 8})
 
 
@@ -100,12 +101,12 @@ def plot_3d(grid_search, reward_means, var1, var2, var3, default_values={}):
 
 
 def rgrief_plots(fig_label,update,grid_search,reward_means,clip,replay_weight,eta,lim,w,p,prediction_errors,reward_course,replay_vec):
-  updates = grid_search['n_updates']
+  updates = grid_search['replays']
   fig,ax = plt.subplots(1,len(updates),figsize=(25,1))
   max_rgrief = []
 
   for n in range(len(updates)):
-    default_values = {'gamma': 0.95, 'alpha': 0.1, 'w': w, 'p': p, 'n_updates': updates[n], 'update': update}  # example default values for non-selected parameters
+    default_values = {'gamma': 0.95, 'alpha': 0.1, 'w': w, 'p': p, 'replays': updates[n], 'update': update}  # example default values for non-selected parameters
     filtered_points = [dict(zip(grid_search.keys(), point)) for point in product(*grid_search.values())]
 
     filtered_points = [point for point in filtered_points if all(point.get(k) == v for k, v in default_values.items())]
@@ -142,11 +143,11 @@ def rgrief_plots(fig_label,update,grid_search,reward_means,clip,replay_weight,et
   plt.show(block=True)
 
 def p_plot(file_label,update,grid_search,rewards,total_errors,eta,varying_params,rws):
-  plt.rcParams.update({'font.size': 12})
+  plt.rcParams.update({'font.size': 14})
   dim1, dim2, dim3 = varying_params[:3]
   # Grid dimensions for subplots
-  n_rows = len(grid_search[dim1])
-  n_cols = len(grid_search[dim2]) if len(varying_params) > 1 else 1
+  n_rows = len(grid_search[dim2])
+  n_cols = len(grid_search[dim3]) if len(varying_params) > 1 else 1
   # Initialize figures for mood and reward plots
   # fig, ax = plt.subplots(2*n_rows, n_cols, figsize=(2.5 * n_cols, 1.5 * n_rows), squeeze=False)
 
@@ -164,13 +165,14 @@ def p_plot(file_label,update,grid_search,rewards,total_errors,eta,varying_params
   for n in range(n_rows):
     for j in range(n_cols):
 
-      default_values = {dim1: grid_search[dim1][n],dim2: grid_search[dim2][j], 'update': update}  # example default values for non-selected parameters
+      default_values = {dim2: grid_search[dim2][n],dim3: grid_search[dim3][j], 'update': update}  # example default values for non-selected parameters
       filtered_points = [dict(zip(grid_search.keys(), point)) for point in product(*grid_search.values())]
       filtered_points = [point for point in filtered_points if all(point.get(k) == v for k, v in default_values.items())]
-      axis1 = np.array([point['p'] if len(varying_params) < 3 else point[varying_params[-1]]/(10 if varying_params[-1]=='pain' else 1) for point in filtered_points])
+      axis1 = np.array([point[dim1]/(10 if dim1=='pain' else 1) for point in filtered_points])
       # axis2 = np.array([point['p'] if len(varying_params) < 3 else point[varying_params[-1]] for point in filtered_points])
 
       labels = [f'reward' + ''.join([f'_{k}:{point[k]}' for k in grid_search.keys()]) for point in filtered_points]
+      print(labels)
 
       combo_list = [np.array(rewards[label]) for label in labels]
       combo_list_min = [np.array(total_errors[label]).T for label in labels]
@@ -183,7 +185,7 @@ def p_plot(file_label,update,grid_search,rewards,total_errors,eta,varying_params
         max_values = axis1[np.argmax(np.array(combo_list),axis=0)]  #0 index is param, 1 index is mood type, 2 index is repetitions
         min_values = axis1[np.argmin(np.array(combo_list_min)[:,i,:],axis=0)]
         # print(np.array(min_values).shape)
-        combo_values = axis1[np.argmin(np.array(combo_eta)[:,i,:],axis=0)]
+        combo_values = axis1[np.argmax(np.array(combo_eta)[:,i,:],axis=0)]
         # print(np.array(combo_values).shape)
 
         max_rgrief[n,j] = np.mean(max_values)
@@ -230,12 +232,12 @@ def p_plot(file_label,update,grid_search,rewards,total_errors,eta,varying_params
   # plt.savefig('pmood'+file_label)
   # plt.show()
   cols = ['c','c','c']
-  alphas = [0.3,0.3,0.4]
+  alphas = [0.2,0.2,0.4]
   labs = ['Experienced','Mixed, $rw = 0.01$','Mixed, $rw = 0.1$','Mixed, $rw = 0.3$','Replayed']
   div = 10 if dim3 == 'pain' else 1
   fig = plt.figure(figsize=(8,8))
   ax = fig.add_subplot(111, projection='3d')
-  for i,plot_var in enumerate([combo_rgrief,combo_rgrief]):
+  for i,plot_var in enumerate([combo_rgrief]):
     print(i,plot_var.shape)
     # if i == 0: n_rows, n_cols = plot_var.shape
     x = np.arange(n_cols)
@@ -247,21 +249,22 @@ def p_plot(file_label,update,grid_search,rewards,total_errors,eta,varying_params
     for j in range(numrw):
       Z = plot_var[:,:,j] if i == 0 else plot_var[:,:,j]
       ax.scatter(X, Y, Z,color=cols[j])#, cmap='cool', edgecolor='none')
-      std = std_max if i == 0 else std_min[:,:,j] if i == 1 else std_combo[:,:,j]
+      # std = std_max if i == 0 else std_min[:,:,j] if i == 1 else std_combo[:,:,j]
+      std = std_combo[:,:,j]
       ax.plot_surface(X, Y, Z+std, color=cols[j], edgecolor='none',alpha=alphas[j],label=labs[j])
       ax.plot_surface(X, Y, Z-std, color=cols[j], edgecolor='none',alpha=alphas[j])
-    ax.set_ylabel('$r_{grief}$' if dim1=='pain' else dim1, weight='bold') 
-    ax.set_xlabel('$r_{grief}$' if dim2=='pain' else dim2, weight='bold')
-    change_lab = '$r_{grief}$' if dim3=='pain' else dim3
-    ax.set_zlabel(f'{change_lab} at {"best reward" if i == 0 else "worst mood" if i == 1 else "best balance"}',weight='bold')
+    # ax.set_ylabel('$r_{grief}$' if dim1=='pain' else dim1, weight='bold') 
+    # ax.set_xlabel('$r_{grief}$' if dim2=='pain' else dim2, weight='bold')
+    # change_lab = '$r_{grief}$' if dim3=='pain' else dim3
+    # ax.set_zlabel(f'{change_lab} at {"best reward" if i == 0 else "worst mood" if i == 1 else "best balance"}',weight='bold')
     fig.tight_layout
-    ax.set_yticks(range(n_rows), grid_search[dim1])
-    ax.set_xticks(range(n_cols), grid_search[dim2])
-    ax.set_zlim(min(grid_search[dim3])/div,max(grid_search[dim3])/div)
+    ax.set_yticks(range(n_rows), [np.array(x)/div for x in grid_search[dim2]])
+    ax.set_xticks(range(n_cols), grid_search[dim3])
+    # ax.set_zlim(0,-10)
     # ax.legend(frameon=0)
     elev,azim = (18,58) if i==2 or i==1 else (22,117)
     ax.view_init(elev=elev, azim=azim)
-    plt.savefig(f'Surface{"RewardMax_" if i == 0 else "MoodMin_" if i == 1 else "ComboMax_"}{file_label}')
+    # plt.savefig(f'Surface{"RewardMax_" if i == 0 else "MoodMin_" if i == 1 else "ComboMax_"}{file_label}')
     plt.show()
 
 
@@ -278,7 +281,7 @@ def mood_plots(grid_search, varying_params, default_params, clip, prediction_err
     fs = 2
     
     # Initialize figures for mood and reward plots
-    fig_mood, axs_mood = plt.subplots(n_rows, n_cols, figsize=(fs*2.5 * n_cols, fs*1.5 * n_rows), squeeze=False)
+    fig_mood, axs_mood = plt.subplots(n_rows, n_cols, figsize=(10, 5), squeeze=False)
     # fig_reward, axs_reward = plt.subplots(n_rows, n_cols, figsize=(3 * n_cols, 2 * n_rows), squeeze=False)
 
     # Loop over each combination of varying parameters
@@ -308,15 +311,16 @@ def mood_plots(grid_search, varying_params, default_params, clip, prediction_err
         ax_mood.plot(trace, 'c',alpha=0.2,label='$\delta$')
         ax_mood.plot(mood,'m',linewidth=2,label='Mood')
         ax_mood.set_ylim(lims[0], lims[1])
+        ax_mood.set_xlim(0, 8000)
         # ax_mood.set_title(title)  # Reduced font size for visibility
         # ax_mood.set_xlabel('Time step')
         ax_mood.spines['right'].set_visible(False)
         ax_mood.spines['top'].set_visible(False)
         ax_mood.spines['left'].set_visible(False)
-        ax_mood.spines['bottom'].set_visible(False)
+        # ax_mood.spines['bottom'].set_visible(False)
         ax_mood.plot(traj,'g-',label='Reward',alpha=0.5,linewidth=3)
         ax_mood.set_yticks([lims[0],np.mean(lims),lims[1]])
-        ax_mood.set_xticks([0,5000])
+        ax_mood.set_xticks([0,8000])
 
         ax_mood.set_xticks([])
         ax_mood.set_yticks([])
@@ -340,11 +344,13 @@ def mood_plots(grid_search, varying_params, default_params, clip, prediction_err
     plt.savefig('Mood'+file_label)
     plt.show()
 
-def bar_plot(rewards,reward_means,reward_stds,n_bars,runs,label,grid_search,varying_params,bar_col,wid,steps):
+def bar_plot(rewards,reward_means,reward_stds,n_bars,runs,label,grid_search,varying_params,bar_col,wid,steps,mood,moodst):
   plt.rcParams.update({'font.size': 20})
   labels = [label for label in rewards][:n_bars]
   means = [reward_means[label] for label in labels]
   stds = [reward_stds[label] for label in labels]
+  moodmeans = [mood[label] for label in labels]
+  moodstds = [moodst[label] for label in labels]
 
   # s1=["".join(c for c in x if not c.isalpha() or c in ['w','S','Q']) for x in labels]
 
@@ -354,6 +360,9 @@ def bar_plot(rewards,reward_means,reward_stds,n_bars,runs,label,grid_search,vary
   num_groups = len(means) // N
   grouped_values = [means[i:i + N] for i in range(0, len(means), N)]
   grouped_stds = [stds[i:i + N] for i in range(0, len(stds), N)]
+
+  grouped_moods = [moodmeans[i:i + N] for i in range(0, len(moodmeans), N)]
+  grouped_moodstds = [moodstds[i:i + N] for i in range(0, len(moodstds), N)]
   cmap = cm.get_cmap(bar_col)  # You can choose another colormap
   # wid = 0.07
   cmap=cmap(np.linspace(0.2, 0.8, N))
@@ -369,12 +378,20 @@ def bar_plot(rewards,reward_means,reward_stds,n_bars,runs,label,grid_search,vary
       # Extracting the ith element from each group
       ith_values = [group[i] for group in grouped_values if len(group) > i]
       ith_stds = [group[i] if len(group) > i and group[i] != 0 else 0 for group in grouped_stds]
+
+      ith_moods = [group[i] for group in grouped_moods if len(group) > i]
+      ith_moodstds = [group[i] if len(group) > i and group[i] != 0 else 0 for group in grouped_moodstds]
+
       color = cmap[i]
       if varying_params[-1] == 'pain': pain_correct = int(grid_search[varying_params[-1]][i]/grid_search['object_value'][0])
       ax.bar(ind + i * wid, ith_values, width=wid, color=color, label='$r_{grief}$' + f' = {pain_correct}' if varying_params[-1] == 'pain' 
                                     else '$\epsilon$' + f' = {grid_search[varying_params[-1]][i]}' if varying_params[-1] == 'final_epsilon' 
                                     else 'Anneal steps: ' + f'{int(1/grid_search[varying_params[-1]][i])}' if varying_params[-1] == 'ep_anneal' 
                                     else f' {varying_params[-1]}' + f': {grid_search[varying_params[-1]][i]}', yerr=ith_stds)
+      
+      # print(ith_moodstds)
+      # ax.bar(ind + i * wid, ith_moods, width=wid, color='m', yerr=ith_moodstds, alpha=0.5)
+
 
   # plt.figure(figsize=(20, 4))
   # plt.bar(ind_groups, means, yerr=stds, alpha=0.6, capsize=10)
@@ -429,7 +446,7 @@ def PGD_correlations(grid_search, varying_params, default_params,clip, predictio
     
     pain_vec = np.array(attachment)
     symp_vec = np.array(symptoms)
-    cols = ['b','g','orange']
+    cols = ['b','m','g']
     plt.figure()
     for k in range(3):
       cors = []
@@ -479,11 +496,11 @@ def reward_surface(file_label,grid_search,rewards,total_errors,eta,varying_param
 
       # rewards_list = np.array(rewards[label])
       # errors_list = np.array(total_errors[label])
-      eta=0.2
-      rewards_list = ((1-eta)*np.array(rewards[label])[:,np.newaxis] + eta*np.array(total_errors[label]))
-      eta=0.8
-      errors_list = ((1-eta)*np.array(rewards[label])[:,np.newaxis] + eta*np.array(total_errors[label]))
-      combination_list = ((1-eta)*np.array(rewards[label])[:,np.newaxis] + eta*np.array(total_errors[label]))
+      # eta=0.2
+      rewards_list = ((1-eta[0])*np.array(rewards[label])[:,np.newaxis] + eta[0]*np.array(total_errors[label]))
+      # eta=0.8
+      errors_list = ((1-eta[1])*np.array(rewards[label])[:,np.newaxis] + eta[1]*np.array(total_errors[label]))
+      # combination_list = ((1-eta)*np.array(rewards[label])[:,np.newaxis] + eta*np.array(total_errors[label]))
 
       # print(np.array(combo_eta).shape)
 
@@ -491,11 +508,11 @@ def reward_surface(file_label,grid_search,rewards,total_errors,eta,varying_param
 
         rewards_achieved[n,j] = np.mean(rewards_list)
         errors[n,j,i] = np.mean(errors_list[:,i])
-        combination[n,j,i] = np.mean(combination_list[:,i])
+        # combination[n,j,i] = np.mean(combination_list[:,i])
 
         rewards_achieved_std[n,j] = np.std(rewards_list)
         errors_std[n,j,i] = np.std(errors_list[:,i])
-        combination_std[n,j,i] = np.std(combination_list[:,i])
+        # combination_std[n,j,i] = np.std(combination_list[:,i])
 
 
   cols = ['g','m','c']
@@ -510,7 +527,7 @@ def reward_surface(file_label,grid_search,rewards,total_errors,eta,varying_param
   fig = plt.figure(figsize=(8,8))
   ax = fig.add_subplot(111, projection='3d')
 
-  for i,plot_var in enumerate([rewards_achieved,0.7+errors/np.max(np.abs(np.array(errors)))]):
+  for i,plot_var in enumerate([rewards_achieved,errors]):#/np.max(np.abs(np.array(errors)))]):
     print(i,plot_var.shape)
     if i == 0: n_rows, n_cols = plot_var.shape
     x = np.arange(n_cols)
@@ -521,7 +538,8 @@ def reward_surface(file_label,grid_search,rewards,total_errors,eta,varying_param
     for j in range(len(rws)):
       Z = plot_var if i == 0 else plot_var[:,:,j]
       ax.scatter(X, Y, Z,color=cols[i])#, cmap='cool', edgecolor='none')
-      std = rewards_achieved_std if i == 0 else errors_std[:,:,j]/np.max(np.abs(np.array(errors))) if i == 1 else combination_std[:,:,j]
+      # std = rewards_achieved_std if i == 0 else errors_std[:,:,j]/np.max(np.abs(np.array(errors))) if i == 1 else combination_std[:,:,j]
+      std = rewards_achieved_std if i == 0 else errors_std[:,:,j] if i == 1 else combination_std[:,:,j]      
       ax.plot_surface(X, Y, Z+std, color=cols[i], edgecolor='none',alpha=alphas[j],label=f'$\eta$ = {eta_labs[i]}, {labs[j]}')
       ax.plot_surface(X, Y, Z-std, color=cols[i], edgecolor='none',alpha=alphas[j])
   ax.set_ylabel('$r_{grief}$' if dim1=='pain' else dim1, weight='bold') 
@@ -541,4 +559,109 @@ def reward_surface(file_label,grid_search,rewards,total_errors,eta,varying_param
 
 
 # ax.set_yscale('log')
+
+def linear_surfaces(file_label,grid_search,rewards,total_errors,eta,varying_params,rws,etas):
+  plt.rcParams.update({'font.size': 12})
+  dim1 = varying_params[0]
+  # Grid dimensions for subplots
+  n_rows = len(grid_search[dim1])
+  # Initialize figures for mood and reward plots  
+  # etas = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
+
+  combination = np.zeros((n_rows,len(etas),len(rws)))
+  combination_std = np.zeros((n_rows,len(etas),len(rws)))
+
+  # colormap that changes continuously from green to magenta
+  cmap = LinearSegmentedColormap.from_list("mycmap", ["g", "m"])
+  
+  for eta in range(len(etas)):
+    for n in range(n_rows):
+      default_values = {dim1: grid_search[dim1][n]}  # example default values for non-selected parameters
+      filtered_points = [dict(zip(grid_search.keys(), point)) for point in product(*grid_search.values())]
+      filtered_points = [point for point in filtered_points if all(point.get(k) == v for k, v in default_values.items())]
+      label = [f'reward' + ''.join([f'_{k}:{point[k]}' for k in grid_search.keys()]) for point in filtered_points]
+      label = label[0]
+
+      combination_list = ((1-etas[eta])*np.array(rewards[label])[:,np.newaxis] + etas[eta]*np.array(total_errors[label]))
+
+      for i in range(len(rws)):  
+        combination[n,eta,i] = np.mean(combination_list[:,i])
+        combination_std[n,eta,i] = np.std(combination_list[:,i])
+
+  labs = [f'Replay weight: {r}' for r in rws]
+  div = 10 if dim1 == 'pain' else 1
+
+  fig, axes = plt.subplots(1,len(rws),figsize=(25,3))
+  for i,ax in enumerate(axes):
+    x = np.array(grid_search[dim1])/div
+    # Surface plot
+    for j in range(len(etas)):
+      compcol = (etas[j] - 0.1)/0.9
+      ax.scatter(x,combination[:,j,i],color=cmap(compcol),alpha=0.2)#, cmap='cool', edgecolor='none')
+      std = combination_std[:,j,i]
+      ax.errorbar(x,combination[:,j,i],yerr=std,color=cmap(compcol),label=f'$\eta$ = {etas[j]}') 
+      print(etas[j],x[np.argmax(combination[:,j,i])])
+      ax.set_ylim(-1.5,1)
+
+    # ax.set_xlabel('$r_{grief}$' if dim1=='pain' else dim1, weight='bold') 
+    # ax.set_ylabel("Contentedness $C$",weight='bold')
+    # ax.set_title(f'{labs[i]}')
+    # fig.tight_layout
+  plt.show()
+  plt.savefig('linear_plot'+file_label)
+
+def linear_max(grid_search,rewards,total_errors,eta,varying_params):
+
+  dim1 = varying_params[0]
+  dim2 = varying_params[1]
+  n_rows = len(grid_search[dim1])
+
+  fig,ax = plt.subplots(1,n_rows,figsize=(25,1))
+  max_rgrief = []
+
+  for n in range(n_rows):
+    default_values = {dim1: grid_search[dim1][n]}  # example default values for non-selected parameters
+    filtered_points = [dict(zip(grid_search.keys(), point)) for point in product(*grid_search.values())]
+    filtered_points = [point for point in filtered_points if all(point.get(k) == v for k, v in default_values.items())]
+
+    axis1 = np.array([point[dim2] for point in filtered_points])
+    labels = [f'reward' + ''.join([f'_{k}:{point[k]}' for k in grid_search.keys()]) for point in filtered_points]
+    # label = labels[0]
+
+    # reward_values = [rewards[label] for label in labels]
+    combo = [(1-eta)*np.array(rewards[label]) + eta*np.array(total_errors[label][0]) for label in labels]
+    # print(axis1,combo)
+    ax[n].scatter(axis1,combo)
+    max_rgrief.append(axis1[np.argmax(combo)])
+
+    # plt.show()
+    # plt.figure()
+  plt.figure()
+  plt.scatter(grid_search[dim1],max_rgrief)
+  plt.show(block=True)
+
+def stop_time(variables):
+    plt.rcParams.update({'font.size': 16})
+    vars = np.array(variables)
+    stops = vars[:,1]
+    # stops[stops==0] = np.nan
+
+    # multiple y-scales, one for each plot
+    fig, ax2 = plt.subplots()
+    ax1 = ax2.twinx()
+    ax1.scatter(vars[:,0],stops,color='indigo',marker='.')
+    ax2.scatter(vars[:,0],vars[:,2],color='g',marker='.')
+    ax1.set_xlabel('$t_{stop}$')
+    ax1.set_ylabel('Time $S_B$ reached', color='indigo')
+    ax2.set_ylabel('Total reward', color='g')
+    ax1.set_ylim(2500,5100)
+    # nan_indices = np.where(np.isnan(stops))[0]
+    # zero_indices = np.where(stops==0)[0]
+    # ax1.axvspan(vars[nan_indices[0],0], vars[nan_indices[-1]+1,0], facecolor='green', alpha=0.1)
+    plt.show(block=True)
+
+    # if stop_variables.append([point['stop_grief'], int(tm[-1,-1]), rew]) created the 'variables' parameter
+    # then the reason for this error message: "ax1.scatter(vars[:,0],vars[:,1],'g-') ValueError: s must be a scalar, or float array-like with the same size as x and y" is:
+    # there is no 's' parameter, so the 'g-' is being interpreted as the 's' parameter, which is incorrect.
+
 
